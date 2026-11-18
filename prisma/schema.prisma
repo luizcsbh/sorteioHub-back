@@ -1,0 +1,377 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMINISTRATOR
+  PARTICIPANT
+}
+
+enum GroupStatus {
+  ATIVO
+  INATIVO
+  ARQUIVADO
+}
+
+enum MembershipStatus {
+  CONVIDADO
+  PENDENTE
+  ATIVO
+  RECUSADO
+  REMOVIDO
+}
+
+enum InvitationType {
+  INDIVIDUAL_EMAIL
+  TOKEN_LINK
+  LIST_IMPORT
+}
+
+enum RaffleVisibility {
+  PRIVADO
+  RESTRITO_A_GRUPO
+  PUBLICO_COM_CONVITE
+}
+
+enum RaffleStatus {
+  DRAFT
+  PUBLISHED
+  DRAWING
+  DRAWN
+  CANCELLED
+}
+
+enum WinnerStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  DELIVERED
+  DISQUALIFIED
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}
+
+model User {
+  id                   String            @id @default(uuid())
+  googleId             String?           @unique
+  name                 String
+  email                String            @unique
+  role                 Role              @default(PARTICIPANT)
+  avatarUrl            String?
+  phone                String?
+  
+  // Dados de CPF protegidos conforme LGPD
+  cpfHash              String?           @unique // HMAC-SHA256 para busca de duplicidade sem expor
+  cpfEncrypted         String?           // AES-256-GCM para retenção segura
+  cpfMasked            String?           // Ex: ***.456.789-** para telas públicas
+  isCpfValidated       Boolean           @default(false)
+  
+  status               String            @default("ACTIVE")
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  // Relacionamentos
+  address              Address?
+  managedGroups        Group[]           @relation("GroupManager")
+  memberships          GroupMember[]
+  raffleParticipations RaffleParticipant[]
+  wonPrizes            Winner[]
+  notifications        Notification[]
+  termsAcceptances     TermsAcceptance[]
+  auditLogs            AuditLog[]
+
+  @@index([email])
+  @@index([cpfHash])
+  @@map("users")
+}
+
+model Address {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cep         String
+  logradouro  String
+  numero      String
+  complemento String?
+  bairro      String
+  cidade      String
+  estado      String   // UF: 2 letras
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+model Group {
+  id             String           @id @default(uuid())
+  name           String
+  description    String?
+  imageUrl       String?
+  status         GroupStatus      @default(ATIVO)
+  maxMembers     Int?
+  autoApprove    Boolean          @default(false)
+  managerId      String
+  manager        User             @relation("GroupManager", fields: [managerId], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Relacionamentos
+  members        GroupMember[]
+  invitations    GroupInvitation[]
+  raffles        Raffle[]
+  campaigns      EmailCampaign[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id         String           @id @default(uuid())
+  groupId    String
+  group      Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     MembershipStatus @default(PENDENTE)
+  joinedAt   DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([groupId, userId])
+  @@index([groupId, status])
+  @@map("group_members")
+}
+
+model GroupInvitation {
+  id           String         @id @default(uuid())
+  groupId      String
+  group        Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  token        String         @unique
+  type         InvitationType @default(TOKEN_LINK)
+  targetEmail  String?
+  maxUses      Int?           @default(1)
+  currentUses  Int            @default(0)
+  expiresAt    DateTime?
+  isRevoked    Boolean        @default(false)
+  createdById  String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([token])
+  @@map("group_invitations")
+}
+
+model Raffle {
+  id                      String            @id @default(uuid())
+  groupId                 String
+  group                   Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title                   String
+  description             String
+  prize                   String
+  rules                   String?
+  winnerInstructions      String?           // Orientações para os contemplados
+  visibility              RaffleVisibility  @default(RESTRITO_A_GRUPO)
+  status                  RaffleStatus      @default(DRAFT)
+  
+  maxEntriesPerPerson     Int               @default(1)
+  numberOfWinners         Int               @default(1)
+  
+  participationStartDate  DateTime
+  participationEndDate    DateTime
+  drawDateTime            DateTime
+  
+  // Requisitos legais e regulatórios
+  legalAuthorizationCode  String?
+  cancellationReason      String?
+
+  createdById             String
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  // Relacionamentos
+  participants            RaffleParticipant[]
+  draws                   Draw[]
+  winners                 Winner[]
+
+  @@index([groupId])
+  @@index([status])
+  @@map("raffles")
+}
+
+model RaffleParticipant {
+  id          String   @id @default(uuid())
+  raffleId    String
+  raffle      Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticketCode  String   @default(uuid())
+  confirmedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([raffleId, userId])
+  @@index([raffleId])
+  @@map("raffle_participants")
+}
+
+model Draw {
+  id               String        @id @default(uuid())
+  raffleId         String
+  raffle           Raffle        @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  executedById     String
+  totalEligible    Int
+  participantsHash String        // SHA-256 do pool de participantes
+  executedAt       DateTime      @default(now())
+  
+  evidence         DrawEvidence?
+  winners          Winner[]
+
+  @@map("draws")
+}
+
+model DrawEvidence {
+  id               String   @id @default(uuid())
+  drawId           String   @unique
+  draw             Draw     @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  seed             String   // Semente criptográfica usada
+  algorithm        String   @default("Node.js crypto.randomInt")
+  rawEligibleIds   String   // JSON serializado dos IDs participantes
+  drawLog          String   // Log detalhado das seleções
+  createdAt        DateTime @default(now())
+
+  @@map("draw_evidence")
+}
+
+model Winner {
+  id                    String       @id @default(uuid())
+  raffleId              String
+  raffle                Raffle       @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  drawId                String
+  draw                  Draw         @relation(fields: [drawId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rankPosition          Int          @default(1)
+  status                WinnerStatus @default(PENDING_CONFIRMATION)
+  notificationSentAt    DateTime?
+  confirmedAt           DateTime?
+  instructionsSent      String?
+  deliveryNotes         String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  @@unique([raffleId, userId])
+  @@map("winners")
+}
+
+model Notification {
+  id          String              @id @default(uuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  channel     NotificationChannel @default(IN_APP)
+  status      NotificationStatus  @default(PENDING)
+  actionUrl   String?
+  readAt      DateTime?
+  createdAt   DateTime            @default(now())
+
+  @@index([userId, status])
+  @@map("notifications")
+}
+
+model EmailCampaign {
+  id          String                    @id @default(uuid())
+  groupId     String
+  group       Group                     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  subject     String
+  body        String
+  status      CampaignStatus            @default(DRAFT)
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  createdById String
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  recipients  EmailCampaignRecipient[]
+
+  @@map("email_campaigns")
+}
+
+model EmailContact {
+  id        String                   @id @default(uuid())
+  email     String                   @unique
+  name      String?
+  optOut    Boolean                  @default(false)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  campaigns EmailCampaignRecipient[]
+
+  @@map("email_contacts")
+}
+
+model EmailCampaignRecipient {
+  id          String         @id @default(uuid())
+  campaignId  String
+  campaign    EmailCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     EmailContact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status      String         @default("PENDING") // PENDING, SENT, FAILED, BOUNCED
+  sentAt      DateTime?
+  errorMessage String?
+
+  @@unique([campaignId, contactId])
+  @@map("email_campaign_recipients")
+}
+
+model TermsAcceptance {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  termType     String   // "TERMS_OF_USE", "PRIVACY_POLICY", "RAFFLE_RULES"
+  version      String
+  ipAddress    String?
+  userAgent    String?
+  acceptedAt   DateTime @default(now())
+
+  @@map("terms_acceptances")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String   // "USER_LOGIN", "CPF_VALIDATED", "DRAW_EXECUTED", "MEMBER_APPROVED", etc.
+  entity     String   // "User", "Group", "Raffle", "Draw"
+  entityId   String?
+  details    String?  // JSON stringificado com dados não sensíveis
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([action])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}

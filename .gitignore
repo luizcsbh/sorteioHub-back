@@ -1,0 +1,30 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+
+# Variáveis de ambiente (contém credenciais reais — NUNCA commitar)
+.env
+.env.local
+.env.*.local
+
+# Prisma generated (regenerado pelo prisma generate)
+# node_modules/@prisma/client é coberto acima
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Coverage
+coverage/
