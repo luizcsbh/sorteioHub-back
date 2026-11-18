@@ -6,7 +6,8 @@ import { encryptCpf, hashCpf } from '../../utils/crypto.js';
 import { logAudit } from '../../utils/audit.js';
 import { Request } from 'express';
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Instância lazy: lida sempre em runtime para garantir o valor correto do .env
+const getGoogleClient = () => new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export interface GoogleAuthInput {
   credential?: string;
@@ -42,9 +43,12 @@ export class AuthService {
     if (input.credential) {
       // Validação real de token Google OAuth
       try {
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        console.log('[GoogleOAuth] GOOGLE_CLIENT_ID em uso:', clientId?.slice(0, 20) + '...');
+        const googleClient = getGoogleClient();
         const ticket = await googleClient.verifyIdToken({
           idToken: input.credential,
-          audience: process.env.GOOGLE_CLIENT_ID,
+          audience: clientId,
         });
         const payload = ticket.getPayload();
         if (!payload || !payload.email) {
