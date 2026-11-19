@@ -42,23 +42,23 @@ export class AuthController {
     res.json({ message: 'Sessão encerrada com sucesso.' });
   }
 
-  static async register(req: Request, res: Response, next: NextFunction) {
+  static async register(req: Request, res: Response) {
     try {
       const { name, email, password } = req.body;
       const result = await AuthService.registerWithEmail({ name, email, password }, req);
       res.status(201).json(result);
     } catch (err: any) {
-      next(err);
+      res.status(400).json({ error: err.message || 'Falha ao cadastrar usuário.' });
     }
   }
 
-  static async loginEmail(req: Request, res: Response, next: NextFunction) {
+  static async loginEmail(req: Request, res: Response) {
     try {
       const { email, password } = req.body;
       const result = await AuthService.loginWithEmail({ email, password }, req);
       res.json(result);
     } catch (err: any) {
-      next(err);
+      res.status(400).json({ error: err.message || 'Falha ao realizar login.' });
     }
   }
 }
