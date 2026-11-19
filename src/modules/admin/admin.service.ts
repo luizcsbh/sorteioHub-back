@@ -1,5 +1,6 @@
 import prisma from '../../config/prisma.js';
 import { Role } from '@prisma/client';
+import { logAudit } from '../../utils/audit.js';
 
 export class AdminService {
   static async getDashboard(userId: string, role: Role) {
@@ -147,5 +148,87 @@ export class AdminService {
       invitations,
       recentAudit,
     };
+  }
+
+  static async getUsers(search?: string, roleFilter?: string) {
+    const where: any = {};
+    if (search && search.trim()) {
+      where.OR = [
+        { name: { contains: search.trim(), mode: 'insensitive' } },
+        { email: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+    if (roleFilter && ['SUPER_ADMIN', 'ADMINISTRATOR', 'PARTICIPANT'].includes(roleFilter)) {
+      where.role = roleFilter;
+    }
+
+    const users = await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        avatarUrl: true,
+        cpfMasked: true,
+        phone: true,
+        isCpfValidated: true,
+        createdAt: true,
+        _count: {
+          select: {
+            memberships: true,
+            managedGroups: true,
+            raffleParticipations: true,
+            wonPrizes: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    return users;
+  }
+
+  static async updateUserRole(adminUserId: string, targetUserId: string, newRole: Role, req?: any) {
+    if (!['SUPER_ADMIN', 'ADMINISTRATOR', 'PARTICIPANT'].includes(newRole)) {
+      throw new Error('Papel de usuário inválido.');
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!targetUser) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    // Se o usuário alvo for o único SUPER_ADMIN e estiver sendo rebaixado, impede
+    if (targetUser.role === 'SUPER_ADMIN' && newRole !== 'SUPER_ADMIN') {
+      const superAdminCount = await prisma.user.count({ where: { role: 'SUPER_ADMIN' } });
+      if (superAdminCount <= 1) {
+        throw new Error('Não é possível rebaixar o único Super Administrador da plataforma.');
+      }
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: targetUserId },
+      data: { role: newRole },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    await logAudit({
+      req,
+      userId: adminUserId,
+      action: 'USER_ROLE_UPDATED',
+      entity: 'User',
+      entityId: targetUserId,
+      details: { previousRole: targetUser.role, newRole },
+    });
+
+    return updated;
   }
 }

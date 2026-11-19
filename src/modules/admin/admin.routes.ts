@@ -21,4 +21,8 @@ router.post('/raffles/:id/draw', RafflesController.executeDraw);
 router.get('/dashboard', AdminController.getDashboard);
 router.get('/reports', AdminController.getReports);
 
+// Gestão de Usuários e Cargos (Roles)
+router.get('/users', AdminController.getUsers);
+router.patch('/users/:id/role', AdminController.updateUserRole);
+
 export default router;
