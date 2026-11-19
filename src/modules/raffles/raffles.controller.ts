@@ -30,9 +30,23 @@ export class RafflesController {
     }
   }
 
+  static async getPublicRaffle(req: Request, res: Response) {
+    try {
+      const raffle = await RafflesService.getPublicRaffle(req.params.identifier);
+      res.json(raffle);
+    } catch (error: any) {
+      res.status(404).json({ error: error.message || 'Sorteio não encontrado.' });
+    }
+  }
+
   static async participate(req: Request, res: Response) {
     try {
-      const result = await RafflesService.participate(req.params.id, req.user!.id, req);
+      const result = await RafflesService.participate(
+        req.params.id,
+        req.user!.id,
+        req,
+        req.body?.cpf
+      );
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message || 'Erro ao confirmar participação.' });

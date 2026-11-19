@@ -47,5 +47,6 @@ export const participateRaffleSchema = z.object({
     acceptedRules: z.literal(true, {
       errorMap: () => ({ message: 'É obrigatório aceitar o regulamento do sorteio para participar.' }),
     }),
+    cpf: z.string().optional(),
   }),
 });

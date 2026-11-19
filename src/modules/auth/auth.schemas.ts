@@ -50,6 +50,9 @@ export const registerSchema = z.object({
       .regex(/[0-9]/, 'Senha deve conter pelo menos um número')
       .regex(/[^A-Za-z0-9]/, 'Senha deve conter pelo menos um caractere especial'),
     confirmPassword: z.string().optional(),
+    cpf: z.string().optional(),
+    phone: z.string().optional(),
+    accountType: z.enum(['PARTICIPANT', 'ADMINISTRATOR']).optional(),
   }).refine((d) => !d.confirmPassword || d.password === d.confirmPassword, {
     message: 'As senhas não conferem.',
     path: ['confirmPassword'],

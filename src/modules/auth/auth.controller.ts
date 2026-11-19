@@ -44,8 +44,11 @@ export class AuthController {
 
   static async register(req: Request, res: Response) {
     try {
-      const { name, email, password } = req.body;
-      const result = await AuthService.registerWithEmail({ name, email, password }, req);
+      const { name, email, password, cpf, phone, accountType } = req.body;
+      const result = await AuthService.registerWithEmail(
+        { name, email, password, cpf, phone, accountType },
+        req
+      );
       res.status(201).json(result);
     } catch (err: any) {
       res.status(400).json({ error: err.message || 'Falha ao cadastrar usuário.' });

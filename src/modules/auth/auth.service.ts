@@ -1,7 +1,7 @@
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../../config/prisma.js';
 import { signJwt } from '../../config/jwt.js';
-import { cleanCpf, maskCpf } from '../../utils/cpf.js';
+import { cleanCpf, maskCpf, isValidCpf } from '../../utils/cpf.js';
 import { encryptCpf, hashCpf } from '../../utils/crypto.js';
 import { logAudit } from '../../utils/audit.js';
 import { Request } from 'express';
@@ -326,7 +326,17 @@ export class AuthService {
     };
   }
 
-  static async registerWithEmail(data: { name: string; email: string; password: string }, req?: Request) {
+  static async registerWithEmail(
+    data: {
+      name: string;
+      email: string;
+      password: string;
+      cpf?: string;
+      phone?: string;
+      accountType?: 'PARTICIPANT' | 'ADMINISTRATOR';
+    },
+    req?: Request
+  ) {
     const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase().trim() } });
     if (existing) {
       throw new Error('Este e-mail já está cadastrado. Faça login ou use o Google para acessar.');
@@ -334,7 +344,31 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(data.password, 12);
     const userCount = await prisma.user.count();
-    const role = userCount === 0 ? 'SUPER_ADMIN' : 'PARTICIPANT';
+    let role: any = userCount === 0 ? 'SUPER_ADMIN' : 'PARTICIPANT';
+    if (userCount > 0 && data.accountType === 'ADMINISTRATOR') {
+      role = 'ADMINISTRATOR';
+    }
+
+    let cpfHash: string | undefined;
+    let cpfEncrypted: string | undefined;
+    let cpfMasked: string | undefined;
+    let isCpfValidated = false;
+
+    if (data.cpf && data.cpf.trim()) {
+      if (!isValidCpf(data.cpf)) {
+        throw new Error('CPF informado é inválido.');
+      }
+      const cleaned = cleanCpf(data.cpf);
+      const hashed = hashCpf(cleaned);
+      const existingCpf = await prisma.user.findUnique({ where: { cpfHash: hashed } });
+      if (existingCpf) {
+        throw new Error('Este CPF já está cadastrado em outra conta.');
+      }
+      cpfHash = hashed;
+      cpfEncrypted = encryptCpf(cleaned);
+      cpfMasked = maskCpf(data.cpf);
+      isCpfValidated = true;
+    }
 
     const user = await prisma.user.create({
       data: {
@@ -342,6 +376,11 @@ export class AuthService {
         email: data.email.toLowerCase().trim(),
         passwordHash,
         role,
+        cpfHash,
+        cpfEncrypted,
+        cpfMasked,
+        isCpfValidated,
+        phone: data.phone,
       },
       include: { address: true },
     });
@@ -352,7 +391,7 @@ export class AuthService {
       action: 'USER_REGISTERED_EMAIL',
       entity: 'User',
       entityId: user.id,
-      details: { email: user.email, role: user.role },
+      details: { email: user.email, role: user.role, accountType: data.accountType },
     });
 
     const token = signJwt({
@@ -365,7 +404,7 @@ export class AuthService {
     return {
       token,
       isNewUser: true,
-      needsProfileCompletion: true,
+      needsProfileCompletion: !user.isCpfValidated || !user.address,
       user: {
         id: user.id,
         name: user.name,

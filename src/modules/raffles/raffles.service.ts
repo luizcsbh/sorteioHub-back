@@ -2,6 +2,8 @@ import prisma from '../../config/prisma.js';
 import { logAudit } from '../../utils/audit.js';
 import { Request } from 'express';
 import { Role } from '@prisma/client';
+import { isValidCpf, cleanCpf, maskCpf } from '../../utils/cpf.js';
+import { hashCpf, encryptCpf } from '../../utils/crypto.js';
 
 export class RafflesService {
   static async createRaffle(userId: string, role: Role, data: any, req?: Request) {
@@ -338,7 +340,80 @@ export class RafflesService {
     };
   }
 
-  static async participate(raffleId: string, userId: string, req?: Request) {
+  static async getPublicRaffle(identifier: string) {
+    const cleanId = identifier.trim().toLowerCase();
+    let raffle = await prisma.raffle.findUnique({
+      where: { id: cleanId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        prize: true,
+        rules: true,
+        winnerInstructions: true,
+        drawDateTime: true,
+        participationStartDate: true,
+        participationEndDate: true,
+        status: true,
+        visibility: true,
+        group: {
+          select: {
+            id: true,
+            name: true,
+            imageUrl: true,
+            description: true,
+          },
+        },
+        _count: {
+          select: {
+            participants: true,
+          },
+        },
+      },
+    });
+
+    if (!raffle && cleanId.length >= 4) {
+      raffle = await prisma.raffle.findFirst({
+        where: {
+          id: { startsWith: cleanId },
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          prize: true,
+          rules: true,
+          winnerInstructions: true,
+          drawDateTime: true,
+          participationStartDate: true,
+          participationEndDate: true,
+          status: true,
+          visibility: true,
+          group: {
+            select: {
+              id: true,
+              name: true,
+              imageUrl: true,
+              description: true,
+            },
+          },
+          _count: {
+            select: {
+              participants: true,
+            },
+          },
+        },
+      });
+    }
+
+    if (!raffle) {
+      throw new Error('Sorteio não encontrado com o PIN ou link informado.');
+    }
+
+    return raffle;
+  }
+
+  static async participate(raffleId: string, userId: string, req?: Request, bodyCpf?: string) {
     const raffle = await prisma.raffle.findUnique({
       where: { id: raffleId },
       include: {
@@ -354,16 +429,50 @@ export class RafflesService {
 
     if (!raffle) throw new Error('Sorteio não encontrado.');
 
-    // 1. Valida se o usuário é membro ativo do grupo
-    const membership = raffle.group.members[0];
-    if (!membership || membership.status !== 'ATIVO') {
-      throw new Error('Você deve ser membro ativo do grupo para participar deste sorteio.');
+    // 1. Auto-associa ou valida o usuário como membro ativo do grupo (estilo Kahoot)
+    let membership = raffle.group.members[0];
+    if (!membership) {
+      membership = await prisma.groupMember.create({
+        data: {
+          groupId: raffle.groupId,
+          userId,
+          status: 'ATIVO',
+          joinedAt: new Date(),
+        },
+      });
+    } else if (membership.status !== 'ATIVO') {
+      membership = await prisma.groupMember.update({
+        where: { id: membership.id },
+        data: { status: 'ATIVO', joinedAt: new Date() },
+      });
     }
 
-    // 2. Valida se usuário tem CPF validado
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.isCpfValidated) {
-      throw new Error('É obrigatório ter o CPF cadastrado e validado para participar.');
+    // 2. Valida se usuário tem CPF validado ou valida na hora via bodyCpf
+    let user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error('Usuário não encontrado.');
+
+    if (!user.isCpfValidated) {
+      if (bodyCpf && isValidCpf(bodyCpf)) {
+        const cleaned = cleanCpf(bodyCpf);
+        const hashed = hashCpf(cleaned);
+        const existingCpf = await prisma.user.findFirst({
+          where: { cpfHash: hashed, NOT: { id: userId } },
+        });
+        if (existingCpf) {
+          throw new Error('Este CPF já está cadastrado em outra conta.');
+        }
+        user = await prisma.user.update({
+          where: { id: userId },
+          data: {
+            cpfHash: hashed,
+            cpfEncrypted: encryptCpf(cleaned),
+            cpfMasked: maskCpf(bodyCpf),
+            isCpfValidated: true,
+          },
+        });
+      } else {
+        throw new Error('É obrigatório ter o CPF cadastrado e validado para participar.');
+      }
     }
 
     // 3. Valida se sorteio está aberto

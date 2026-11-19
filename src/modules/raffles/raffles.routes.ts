@@ -6,7 +6,10 @@ import { participateRaffleSchema } from './raffles.schemas.js';
 
 const router = Router();
 
-// Todas as rotas de sorteio exigem autenticação
+// Rota pública para consulta de sorteio via link ou PIN (estilo Kahoot)
+router.get('/public/:identifier', RafflesController.getPublicRaffle);
+
+// Todas as demais rotas de sorteio exigem autenticação
 router.use(authenticate);
 
 router.get('/', RafflesController.listRaffles);

@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyJwt } from '../config/jwt.js';
 import { Role } from '@prisma/client';
+import prisma from '../config/prisma.js';
+import { isValidCpf } from '../utils/cpf.js';
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
@@ -36,19 +38,34 @@ export function requireRole(...allowedRoles: Role[]) {
   };
 }
 
-export function requireValidatedCpf(req: Request, res: Response, next: NextFunction): void {
+export async function requireValidatedCpf(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!req.user) {
     res.status(401).json({ error: 'Acesso não autenticado.' });
     return;
   }
 
-  if (!req.user.isCpfValidated) {
-    res.status(403).json({
-      error: 'É obrigatório ter um CPF válido cadastrado para participar desta ação.',
-      code: 'CPF_REQUIRED',
-    });
-    return;
+  if (req.user.isCpfValidated) {
+    return next();
   }
 
-  next();
+  // Verifica se o usuário tem CPF validado no banco
+  const dbUser = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { isCpfValidated: true },
+  });
+
+  if (dbUser?.isCpfValidated) {
+    req.user.isCpfValidated = true;
+    return next();
+  }
+
+  // Se enviou CPF no corpo da requisição (ex: fluxo de participação rápida estilo Kahoot)
+  if (req.body?.cpf && isValidCpf(req.body.cpf)) {
+    return next();
+  }
+
+  res.status(403).json({
+    error: 'É obrigatório ter um CPF válido cadastrado para participar desta ação.',
+    code: 'CPF_REQUIRED',
+  });
 }
