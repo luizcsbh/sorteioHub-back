@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import corsMiddleware from './config/cors.js';
 
 import authRoutes from './modules/auth/auth.routes.js';
 import groupsRoutes from './modules/groups/groups.routes.js';
@@ -13,14 +13,14 @@ import notificationsRoutes from './modules/notifications/notifications.routes.js
 
 export const app = express();
 
-// Middlewares de segurança
-app.use(helmet());
+// Middlewares de segurança e CORS
 app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || '*',
-    credentials: true,
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
   })
 );
+app.use(corsMiddleware);
 
 // Rate Limiter para conter abusos
 const limiter = rateLimit({
