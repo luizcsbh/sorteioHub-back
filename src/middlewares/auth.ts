@@ -59,7 +59,7 @@ export async function requireValidatedCpf(req: Request, res: Response, next: Nex
     return next();
   }
 
-  // Se enviou CPF no corpo da requisição (ex: fluxo de participação rápida estilo Kahoot)
+  // Se enviou CPF no corpo da requisição (ex: fluxo de participação rápida via PIN)
   if (req.body?.cpf && isValidCpf(req.body.cpf)) {
     return next();
   }

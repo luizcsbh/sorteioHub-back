@@ -429,7 +429,7 @@ export class RafflesService {
 
     if (!raffle) throw new Error('Sorteio não encontrado.');
 
-    // 1. Auto-associa ou valida o usuário como membro ativo do grupo (estilo Kahoot)
+    // 1. Auto-associa ou valida o usuário como membro ativo do grupo (fluxo de link/PIN direto)
     let membership = raffle.group.members[0];
     if (!membership) {
       membership = await prisma.groupMember.create({
