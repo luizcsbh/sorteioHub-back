@@ -82,6 +82,7 @@ model User {
   email                String            @unique
   role                 Role              @default(PARTICIPANT)
   avatarUrl            String?
+  passwordHash         String?           // null para usuários que só usam Google OAuth
   phone                String?
   
   // Dados de CPF protegidos conforme LGPD

@@ -5,6 +5,7 @@ import { cleanCpf, maskCpf } from '../../utils/cpf.js';
 import { encryptCpf, hashCpf } from '../../utils/crypto.js';
 import { logAudit } from '../../utils/audit.js';
 import { Request } from 'express';
+import bcrypt from 'bcryptjs';
 
 // Instância lazy: lida sempre em runtime para garantir o valor correto do .env
 const getGoogleClient = () => new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -321,6 +322,111 @@ export class AuthService {
       isCpfValidated: user.isCpfValidated,
       address: user.address,
       counts: user._count,
+    };
+  }
+
+  static async registerWithEmail(data: { name: string; email: string; password: string }, req?: Request) {
+    const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase().trim() } });
+    if (existing) {
+      throw new Error('Este e-mail já está cadastrado. Faça login ou use o Google para acessar.');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 12);
+    const userCount = await prisma.user.count();
+    const role = userCount === 0 ? 'SUPER_ADMIN' : 'PARTICIPANT';
+
+    const user = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email.toLowerCase().trim(),
+        passwordHash,
+        role,
+      },
+      include: { address: true },
+    });
+
+    await logAudit({
+      req,
+      userId: user.id,
+      action: 'USER_REGISTERED_EMAIL',
+      entity: 'User',
+      entityId: user.id,
+      details: { email: user.email, role: user.role },
+    });
+
+    const token = signJwt({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      isCpfValidated: user.isCpfValidated,
+    });
+
+    return {
+      token,
+      isNewUser: true,
+      needsProfileCompletion: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        phone: user.phone,
+        cpfMasked: user.cpfMasked,
+        isCpfValidated: user.isCpfValidated,
+        address: user.address,
+      },
+    };
+  }
+
+  static async loginWithEmail(data: { email: string; password: string }, req?: Request) {
+    const user = await prisma.user.findUnique({
+      where: { email: data.email.toLowerCase().trim() },
+      include: { address: true },
+    });
+
+    if (!user || !user.passwordHash) {
+      throw new Error('E-mail ou senha inválidos.');
+    }
+
+    const valid = await bcrypt.compare(data.password, user.passwordHash);
+    if (!valid) {
+      throw new Error('E-mail ou senha inválidos.');
+    }
+
+    await logAudit({
+      req,
+      userId: user.id,
+      action: 'USER_LOGIN_EMAIL',
+      entity: 'User',
+      entityId: user.id,
+      details: { email: user.email },
+    });
+
+    const needsProfileCompletion = !user.isCpfValidated || !user.address;
+
+    const token = signJwt({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      isCpfValidated: user.isCpfValidated,
+    });
+
+    return {
+      token,
+      isNewUser: false,
+      needsProfileCompletion,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        phone: user.phone,
+        cpfMasked: user.cpfMasked,
+        isCpfValidated: user.isCpfValidated,
+        address: user.address,
+      },
     };
   }
 }
