@@ -90,4 +90,32 @@ export class AuthController {
       res.status(400).json({ error: err.message || 'Falha ao alterar senha.' });
     }
   }
+
+  static async forgotPassword(req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({ error: 'E-mail é obrigatório.' });
+        return;
+      }
+      const result = await AuthService.forgotPassword(email);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Falha ao processar solicitação.' });
+    }
+  }
+
+  static async resetPassword(req: Request, res: Response) {
+    try {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) {
+        res.status(400).json({ error: 'Token e nova senha são obrigatórios.' });
+        return;
+      }
+      const result = await AuthService.resetPassword(token, newPassword, req);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Falha ao redefinir senha.' });
+    }
+  }
 }

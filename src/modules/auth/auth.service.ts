@@ -6,6 +6,8 @@ import { encryptCpf, hashCpf } from '../../utils/crypto.js';
 import { logAudit } from '../../utils/audit.js';
 import { Request } from 'express';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
+import { EmailService } from '../../services/email.service.js';
 
 // Instância lazy: lida sempre em runtime para garantir o valor correto do .env
 const getGoogleClient = () => new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -595,5 +597,72 @@ export class AuthService {
     });
 
     return { message: 'Senha atualizada com sucesso!' };
+  }
+
+  static async forgotPassword(email: string) {
+    // Retorna mensagem padrão para evitar enumeração de e-mails
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (!user) {
+      return { message: 'Se este e-mail estiver cadastrado, você receberá as instruções em breve.' };
+    }
+
+    // Invalida tokens anteriores não utilizados
+    await prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, used: false },
+      data: { used: true },
+    });
+
+    // Gera token seguro com validade de 1 hora
+    const rawToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        token: rawToken,
+        expiresAt,
+      },
+    });
+
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/+$/, '');
+    const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
+
+    await EmailService.sendPasswordResetEmail(user.email, user.name, resetUrl);
+
+    return { message: 'Se este e-mail estiver cadastrado, você receberá as instruções em breve.' };
+  }
+
+  static async resetPassword(token: string, newPassword: string, req?: Request) {
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+      throw new Error('Link de redefinição inválido ou expirado. Solicite um novo link.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      });
+      await tx.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { used: true },
+      });
+    });
+
+    await logAudit({
+      req,
+      userId: resetToken.userId,
+      action: 'PASSWORD_RESET_VIA_EMAIL',
+      entity: 'User',
+      entityId: resetToken.userId,
+    });
+
+    return { message: 'Senha redefinida com sucesso! Você já pode fazer login.' };
   }
 }

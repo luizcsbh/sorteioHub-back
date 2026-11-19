@@ -186,4 +186,43 @@ export class EmailService {
       html,
     });
   }
+
+  /**
+   * E-mail de redefinição de senha
+   */
+  static async sendPasswordResetEmail(to: string, name: string, resetUrl: string) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; background-color: #0f172a; padding: 30px; color: #ffffff;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
+          <div style="background: linear-gradient(135deg, #1e1b4b, #312e81); padding: 30px; text-align: center; color: #ffffff; border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <h1 style="margin: 0; font-size: 24px; color: #facc15;">🔐 Redefinição de Senha</h1>
+            <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.7);">SorteioHub • Segurança da Conta</p>
+          </div>
+          <div style="padding: 32px;">
+            <p style="font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.85);">Olá, <strong style="color: #facc15;">${name}</strong>!</p>
+            <p style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7);">Recebemos uma solicitação para redefinir a senha da sua conta no SorteioHub. Clique no botão abaixo para criar uma nova senha:</p>
+            <div style="margin: 28px 0; text-align: center;">
+              <a href="${resetUrl}" style="background-color: #facc15; color: #0f172a; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 15px; display: inline-block; letter-spacing: 0.5px;">
+                Redefinir Minha Senha
+              </a>
+            </div>
+            <div style="background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; margin: 20px 0;">
+              <p style="margin: 0; font-size: 12px; color: rgba(255,255,255,0.5);">⏱️ Este link expira em <strong style="color: rgba(255,255,255,0.8);">1 hora</strong>. Após este prazo, será necessário solicitar um novo link.</p>
+            </div>
+            <p style="font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.6;">Se você não solicitou a redefinição de senha, desconsidere esta mensagem. Sua conta permanece segura.</p>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 16px; word-break: break-all;">Link direto: ${resetUrl}</p>
+          </div>
+          <div style="background-color: rgba(0,0,0,0.3); padding: 16px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.3); border-top: 1px solid rgba(255,255,255,0.08);">
+            SorteioHub • Plataforma de Sorteios Privados em Grupos Fechados (LGPD Compliant)
+          </div>
+        </div>
+      </div>
+    `;
+
+    return this.sendMail({
+      to,
+      subject: '🔐 Redefinição de Senha — SorteioHub',
+      html,
+    });
+  }
 }
