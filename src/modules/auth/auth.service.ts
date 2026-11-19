@@ -320,6 +320,7 @@ export class AuthService {
       phone: user.phone,
       cpfMasked: user.cpfMasked,
       isCpfValidated: user.isCpfValidated,
+      hasPassword: !!user.passwordHash,
       address: user.address,
       counts: user._count,
     };
@@ -425,8 +426,135 @@ export class AuthService {
         phone: user.phone,
         cpfMasked: user.cpfMasked,
         isCpfValidated: user.isCpfValidated,
+        hasPassword: !!user.passwordHash,
         address: user.address,
       },
     };
+  }
+
+  static async updateProfile(
+    userId: string,
+    data: {
+      name?: string;
+      phone?: string | null;
+      avatarUrl?: string | null;
+      address?: {
+        cep: string;
+        logradouro: string;
+        numero: string;
+        complemento?: string | null;
+        bairro: string;
+        cidade: string;
+        estado: string;
+      };
+    },
+    req?: Request
+  ) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { address: true },
+    });
+
+    if (!user) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          name: data.name ?? user.name,
+          phone: data.phone !== undefined ? data.phone : user.phone,
+          avatarUrl: data.avatarUrl !== undefined ? data.avatarUrl : user.avatarUrl,
+        },
+      });
+
+      let updatedAddress = user.address;
+      if (data.address) {
+        updatedAddress = await tx.address.upsert({
+          where: { userId },
+          create: {
+            userId,
+            cep: data.address.cep.replace(/\D/g, ''),
+            logradouro: data.address.logradouro,
+            numero: data.address.numero,
+            complemento: data.address.complemento,
+            bairro: data.address.bairro,
+            cidade: data.address.cidade,
+            estado: data.address.estado.toUpperCase(),
+          },
+          update: {
+            cep: data.address.cep.replace(/\D/g, ''),
+            logradouro: data.address.logradouro,
+            numero: data.address.numero,
+            complemento: data.address.complemento,
+            bairro: data.address.bairro,
+            cidade: data.address.cidade,
+            estado: data.address.estado.toUpperCase(),
+          },
+        });
+      }
+
+      return { user: updatedUser, address: updatedAddress };
+    });
+
+    await logAudit({
+      req,
+      userId,
+      action: 'USER_UPDATED_PROFILE',
+      entity: 'User',
+      entityId: userId,
+      details: { name: data.name, phone: data.phone },
+    });
+
+    return {
+      id: updated.user.id,
+      name: updated.user.name,
+      email: updated.user.email,
+      role: updated.user.role,
+      avatarUrl: updated.user.avatarUrl,
+      phone: updated.user.phone,
+      cpfMasked: updated.user.cpfMasked,
+      isCpfValidated: updated.user.isCpfValidated,
+      hasPassword: !!updated.user.passwordHash,
+      address: updated.address,
+    };
+  }
+
+  static async changePassword(
+    userId: string,
+    data: { currentPassword?: string; newPassword: string },
+    req?: Request
+  ) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    if (user.passwordHash) {
+      if (!data.currentPassword) {
+        throw new Error('Informe sua senha atual para definir uma nova senha.');
+      }
+      const isMatch = await bcrypt.compare(data.currentPassword, user.passwordHash);
+      if (!isMatch) {
+        throw new Error('A senha atual informada está incorreta.');
+      }
+    }
+
+    const newPasswordHash = await bcrypt.hash(data.newPassword, 12);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    await logAudit({
+      req,
+      userId,
+      action: user.passwordHash ? 'PASSWORD_CHANGED' : 'PASSWORD_CREATED',
+      entity: 'User',
+      entityId: userId,
+    });
+
+    return { message: 'Senha atualizada com sucesso!' };
   }
 }

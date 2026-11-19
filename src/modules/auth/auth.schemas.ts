@@ -62,3 +62,37 @@ export const emailLoginSchema = z.object({
     password: z.string().min(1, 'Senha é obrigatória'),
   }),
 });
+
+export const updateProfileSchema = z.object({
+  body: z.object({
+    name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').optional(),
+    phone: z.string().min(10, 'Telefone deve ter no mínimo 10 dígitos com DDD').optional().nullable(),
+    avatarUrl: z.string().url('URL de avatar inválida').optional().nullable(),
+    address: z
+      .object({
+        cep: z.string().min(8, 'CEP deve ter 8 dígitos'),
+        logradouro: z.string().min(2, 'Logradouro é obrigatório'),
+        numero: z.string().min(1, 'Número é obrigatório'),
+        complemento: z.string().optional().nullable(),
+        bairro: z.string().min(2, 'Bairro é obrigatório'),
+        cidade: z.string().min(2, 'Cidade é obrigatória'),
+        estado: z.string().length(2, 'Estado deve conter a sigla UF de 2 letras'),
+      })
+      .optional(),
+  }),
+});
+
+export const changePasswordSchema = z.object({
+  body: z.object({
+    currentPassword: z.string().optional(),
+    newPassword: z.string().min(8, 'Nova senha deve ter no mínimo 8 caracteres')
+      .regex(/[A-Z]/, 'Nova senha deve conter pelo menos uma letra maiúscula')
+      .regex(/[a-z]/, 'Nova senha deve conter pelo menos uma letra minúscula')
+      .regex(/[0-9]/, 'Nova senha deve conter pelo menos um número')
+      .regex(/[^A-Za-z0-9]/, 'Nova senha deve conter pelo menos um caractere especial'),
+    confirmPassword: z.string().optional(),
+  }).refine((d) => !d.confirmPassword || d.newPassword === d.confirmPassword, {
+    message: 'A confirmação da nova senha não confere.',
+    path: ['confirmPassword'],
+  }),
+});

@@ -61,4 +61,30 @@ export class AuthController {
       res.status(400).json({ error: err.message || 'Falha ao realizar login.' });
     }
   }
+
+  static async updateProfile(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'Usuário não autenticado.' });
+        return;
+      }
+      const result = await AuthService.updateProfile(req.user.id, req.body, req);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Falha ao atualizar perfil.' });
+    }
+  }
+
+  static async changePassword(req: Request, res: Response) {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'Usuário não autenticado.' });
+        return;
+      }
+      const result = await AuthService.changePassword(req.user.id, req.body, req);
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Falha ao alterar senha.' });
+    }
+  }
 }
