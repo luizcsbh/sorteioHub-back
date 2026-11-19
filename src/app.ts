@@ -34,6 +34,18 @@ const limiter = rateLimit({
 app.use(limiter);
 app.use(express.json());
 
+// Rota raiz (Verificação de status)
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ONLINE',
+    service: 'SorteioHub API',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    health: '/health',
+    docs: 'Endpoints disponíveis em /api/*',
+  });
+});
+
 // Endpoint de verificação de integridade
 app.get('/health', (req, res) => {
   res.json({
@@ -43,13 +55,24 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Registro de Rotas da API
+// Registro de Rotas da API (com suporte com ou sem prefixo /api)
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
+
 app.use('/api/groups', groupsRoutes);
+app.use('/groups', groupsRoutes);
+
 app.use('/api/raffles', rafflesRoutes);
+app.use('/raffles', rafflesRoutes);
+
 app.use('/api/admin', adminRoutes);
+app.use('/admin', adminRoutes);
+
 app.use('/api/admin/campaigns', campaignsRoutes);
+app.use('/admin/campaigns', campaignsRoutes);
+
 app.use('/api/notifications', notificationsRoutes);
+app.use('/notifications', notificationsRoutes);
 
 // Tratamento de rota não encontrada
 app.use((req, res) => {
