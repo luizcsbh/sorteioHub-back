@@ -1,4 +1,4 @@
-import { mailTransporter, mailDefaults } from '../config/mail.js';
+import { mailTransporter, mailDefaults, resendClient } from '../config/mail.js';
 
 export interface SendMailOptions {
   to: string;
@@ -9,27 +9,51 @@ export interface SendMailOptions {
 
 export class EmailService {
   /**
-   * Envia e-mail genérico com fallback seguro caso o Mailtrap não esteja configurado
+   * Envia e-mail utilizando Resend (HTTP API) prioritariamente,
+   * com fallback para SMTP (Nodemailer / Mailtrap) e modo simulação se não houver credenciais.
    */
   static async sendMail(options: SendMailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.log(`[Mailtrap Sandbox] (Credenciais ausentes - simulação de envio para ${options.to}): Assunto: "${options.subject}"`);
-        return { success: true, messageId: 'simulated-mailtrap-id' };
+      // 1. Prioridade: Resend via API HTTP oficial
+      if (resendClient) {
+        const fromAddress = mailDefaults.from;
+        const response = await resendClient.emails.send({
+          from: fromAddress,
+          to: options.to,
+          subject: options.subject,
+          text: options.text,
+          html: options.html,
+        });
+
+        if (response.error) {
+          console.error(`[Resend] Falha no disparo para ${options.to}:`, response.error.message);
+          return { success: false, error: response.error.message };
+        }
+
+        const messageId = response.data?.id;
+        console.log(`[Resend] E-mail enviado com sucesso para ${options.to}. ID: ${messageId}`);
+        return { success: true, messageId };
       }
 
-      const info = await mailTransporter.sendMail({
-        from: mailDefaults.from,
-        to: options.to,
-        subject: options.subject,
-        text: options.text,
-        html: options.html,
-      });
+      // 2. Fallback: SMTP via Nodemailer
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        const info = await mailTransporter.sendMail({
+          from: mailDefaults.from,
+          to: options.to,
+          subject: options.subject,
+          text: options.text,
+          html: options.html,
+        });
 
-      console.log(`[Mailtrap] E-mail enviado com sucesso para ${options.to}. ID: ${info.messageId}`);
-      return { success: true, messageId: info.messageId };
+        console.log(`[SMTP] E-mail enviado com sucesso para ${options.to}. ID: ${info.messageId}`);
+        return { success: true, messageId: info.messageId };
+      }
+
+      // 3. Fallback seguro: Simulação em ambiente de desenvolvimento sem credenciais
+      console.log(`[Email Simulado] (Credenciais ausentes - simulação para ${options.to}): Assunto: "${options.subject}"`);
+      return { success: true, messageId: 'simulated-email-id' };
     } catch (error: any) {
-      console.error(`[Mailtrap] Falha no disparo para ${options.to}:`, error.message);
+      console.error(`[Email Service] Falha no disparo para ${options.to}:`, error.message);
       return { success: false, error: error.message };
     }
   }
