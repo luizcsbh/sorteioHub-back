@@ -640,6 +640,7 @@ export class AuthService {
     const emailResult = await EmailService.sendPasswordResetEmail(user.email, user.name, resetUrl);
     if (!emailResult.success) {
       console.error(`[ForgotPassword] Não foi possível enviar o e-mail para ${user.email}:`, emailResult.error);
+      throw new Error(`Falha no envio do e-mail (${emailResult.error}). Verifique as configurações de e-mail do servidor.`);
     }
 
     return { message: 'Se este e-mail estiver cadastrado, você receberá as instruções em breve.' };
