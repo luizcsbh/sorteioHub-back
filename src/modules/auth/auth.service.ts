@@ -120,6 +120,9 @@ export class AuthService {
         details: { email, role: user.role },
       });
     } else {
+      // Detecta se a conta foi localizada pelo e-mail mas ainda não tinha googleId (vinculação)
+      const wasLinkedByEmail = !user.googleId && !!email;
+
       // Atualiza avatar ou googleId se estavam pendentes
       if (!user.googleId || !user.avatarUrl) {
         user = await prisma.user.update({
@@ -137,11 +140,14 @@ export class AuthService {
       await logAudit({
         req,
         userId: user.id,
-        action: 'USER_LOGIN_GOOGLE',
+        action: wasLinkedByEmail ? 'USER_GOOGLE_LINKED_BY_EMAIL' : 'USER_LOGIN_GOOGLE',
         entity: 'User',
         entityId: user.id,
-        details: { email },
+        details: { email, wasLinkedByEmail },
       });
+
+      // Expõe flag para o frontend mostrar mensagem de vinculação
+      (user as any)._wasLinkedByEmail = wasLinkedByEmail;
     }
 
     const needsProfileCompletion = !user.isCpfValidated || !user.address;
@@ -156,6 +162,7 @@ export class AuthService {
     return {
       token,
       isNewUser,
+      linkedByEmail: !isNewUser && !!(user as any)._wasLinkedByEmail,
       needsProfileCompletion,
       user: {
         id: user.id,
