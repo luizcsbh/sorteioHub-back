@@ -634,7 +634,13 @@ export class AuthService {
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/+$/, '');
     const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
 
-    await EmailService.sendPasswordResetEmail(user.email, user.name, resetUrl);
+    // Log auxiliar em desenvolvimento para testes rápidos
+    console.log(`[ForgotPassword] Link gerado para ${user.email}: ${resetUrl}`);
+
+    const emailResult = await EmailService.sendPasswordResetEmail(user.email, user.name, resetUrl);
+    if (!emailResult.success) {
+      console.error(`[ForgotPassword] Não foi possível enviar o e-mail para ${user.email}:`, emailResult.error);
+    }
 
     return { message: 'Se este e-mail estiver cadastrado, você receberá as instruções em breve.' };
   }
