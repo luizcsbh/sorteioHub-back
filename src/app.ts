@@ -38,7 +38,7 @@ app.use(express.json());
 app.get('/', (req, res) => {
   res.json({
     status: 'ONLINE',
-    service: 'SorteioHub API',
+    service: 'SorteioClub API',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     health: '/health',
@@ -51,7 +51,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    service: 'SorteioHub API',
+    service: 'SorteioClub API',
   });
 });
 

@@ -23,5 +23,5 @@ export const mailDefaults = {
     process.env.RESEND_FROM ||
     process.env.EMAIL_FROM ||
     process.env.SMTP_FROM ||
-    '"SorteioHub" <onboarding@resend.dev>',
+    '"SorteioClub" <onboarding@resend.dev>',
 };

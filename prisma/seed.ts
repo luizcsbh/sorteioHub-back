@@ -10,10 +10,10 @@ async function main() {
   // 1. Super Admin
   const adminCpf = '52998224725';
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'admin@sorteiohub.com.br' },
+    where: { email: 'admin@sorteioclub.com.br' },
     update: {},
     create: {
-      email: 'admin@sorteiohub.com.br',
+      email: 'admin@sorteioclub.com.br',
       name: 'Administrador Geral',
       role: Role.SUPER_ADMIN,
       googleId: 'google_admin_master_001',
@@ -95,11 +95,11 @@ async function main() {
   });
 
   // 4. Grupo Fechado VIP
-  let group = await prisma.group.findFirst({ where: { name: 'Comunidade VIP SorteioHub' } });
+  let group = await prisma.group.findFirst({ where: { name: 'Comunidade VIP SorteioClub' } });
   if (!group) {
     group = await prisma.group.create({
       data: {
-        name: 'Comunidade VIP SorteioHub',
+        name: 'Comunidade VIP SorteioClub',
         description: 'Grupo fechado exclusivo para sorteios auditáveis e premiações especiais.',
         managerId: gestor.id,
         status: GroupStatus.ATIVO,
@@ -163,7 +163,7 @@ async function main() {
     await prisma.notification.create({
       data: {
         userId: joao.id,
-        title: 'Bem-vindo ao grupo Comunidade VIP SorteioHub',
+        title: 'Bem-vindo ao grupo Comunidade VIP SorteioClub',
         message: 'Você já está inscrito no sorteio do iPhone 16 Pro 256GB! Boa sorte!',
         actionUrl: `/raffles/${raffle.id}`,
       },

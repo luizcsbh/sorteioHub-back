@@ -5,7 +5,7 @@ describe('JWT & Session Security', () => {
   it('deve assinar e verificar token JWT com dados do usuário', () => {
     const payload = {
       id: 'test-user-uuid-1234',
-      email: 'test@sorteiohub.com.br',
+      email: 'test@sorteioclub.com.br',
       role: 'ADMINISTRATOR' as const,
       isCpfValidated: true,
     };

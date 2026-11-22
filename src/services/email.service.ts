@@ -88,7 +88,7 @@ export class EmailService {
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
           <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 30px; text-align: center; color: #ffffff;">
             <h1 style="margin: 0; font-size: 26px;">🎉 Parabéns, ${name}!</h1>
-            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Você foi contemplado no SorteioHub!</p>
+            <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.9;">Você foi contemplado no SorteioClub!</p>
           </div>
           <div style="padding: 30px;">
             <p style="font-size: 16px; line-height: 1.6;">Temos o prazer de informar que seu bilhete foi selecionado no sorteio:</p>
@@ -108,10 +108,10 @@ export class EmailService {
             `
                 : ''
             }
-            <p style="font-size: 13px; color: #64748b; margin-top: 25px;">Acesse sua conta no SorteioHub para conferir os detalhes e o comprovante com auditoria criptográfica.</p>
+            <p style="font-size: 13px; color: #64748b; margin-top: 25px;">Acesse sua conta no SorteioClub para conferir os detalhes e o comprovante com auditoria criptográfica.</p>
           </div>
           <div style="background-color: #f8fafc; padding: 16px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-            SorteioHub • Plataforma de Sorteios Privados em Grupos Fechados (LGPD Compliant)
+            SorteioClub • Plataforma de Sorteios Privados em Grupos Fechados (LGPD Compliant)
           </div>
         </div>
       </div>
@@ -133,7 +133,7 @@ export class EmailService {
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
           <div style="background-color: #0f172a; padding: 24px; text-align: center; color: #ffffff;">
             <h2 style="margin: 0; font-size: 20px;">Sorteio Concluído</h2>
-            <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">SorteioHub • Resultados Oficiais</p>
+            <p style="margin: 6px 0 0 0; font-size: 13px; color: #94a3b8;">SorteioClub • Resultados Oficiais</p>
           </div>
           <div style="padding: 24px;">
             <p style="font-size: 14px; line-height: 1.6;">Olá, <strong>${name}</strong>!</p>
@@ -146,7 +146,7 @@ export class EmailService {
             </div>
           </div>
           <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-            SorteioHub • Sorteios Auditáveis & LGPD
+            SorteioClub • Sorteios Auditáveis & LGPD
           </div>
         </div>
       </div>
@@ -168,11 +168,11 @@ export class EmailService {
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0;">
           <div style="background: linear-gradient(135deg, #4f46e5, #6366f1); padding: 26px; text-align: center; color: #ffffff;">
             <h2 style="margin: 0; font-size: 22px;">Convite para Grupo Fechado</h2>
-            <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">SorteioHub • Acesso Exclusivo</p>
+            <p style="margin: 6px 0 0 0; font-size: 13px; opacity: 0.9;">SorteioClub • Acesso Exclusivo</p>
           </div>
           <div style="padding: 26px;">
             <p style="font-size: 14px; line-height: 1.6;">Olá!</p>
-            <p style="font-size: 14px; line-height: 1.6;">Você foi convidado por <strong>${managerName}</strong> para participar do grupo privado <strong>"${groupName}"</strong> no SorteioHub.</p>
+            <p style="font-size: 14px; line-height: 1.6;">Você foi convidado por <strong>${managerName}</strong> para participar do grupo privado <strong>"${groupName}"</strong> no SorteioClub.</p>
             <p style="font-size: 14px; line-height: 1.6;">Neste grupo, você terá acesso a sorteios exclusivos com garantia de integridade, transparência e proteção de dados (LGPD).</p>
             <div style="margin: 25px 0; text-align: center;">
               <a href="${inviteUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">
@@ -187,7 +187,7 @@ export class EmailService {
 
     return this.sendMail({
       to,
-      subject: `Convite: Entre no grupo fechado "${groupName}" no SorteioHub`,
+      subject: `Convite: Entre no grupo fechado "${groupName}" no SorteioClub`,
       html,
     });
   }
@@ -213,7 +213,7 @@ export class EmailService {
             </div>
           </div>
           <div style="background-color: #f8fafc; padding: 14px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0;">
-            Mensagem enviada através do SorteioHub. Se deseja não receber mais convites desta lista, utilize o link de descadastro.
+            Mensagem enviada através do SorteioClub. Se deseja não receber mais convites desta lista, utilize o link de descadastro.
           </div>
         </div>
       </div>
@@ -235,11 +235,11 @@ export class EmailService {
         <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
           <div style="background: linear-gradient(135deg, #1e1b4b, #312e81); padding: 30px; text-align: center; color: #ffffff; border-bottom: 1px solid rgba(255,255,255,0.1);">
             <h1 style="margin: 0; font-size: 24px; color: #facc15;">🔐 Redefinição de Senha</h1>
-            <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.7);">SorteioHub • Segurança da Conta</p>
+            <p style="margin: 8px 0 0 0; font-size: 14px; color: rgba(255,255,255,0.7);">SorteioClub • Segurança da Conta</p>
           </div>
           <div style="padding: 32px;">
             <p style="font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.85);">Olá, <strong style="color: #facc15;">${name}</strong>!</p>
-            <p style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7);">Recebemos uma solicitação para redefinir a senha da sua conta no SorteioHub. Clique no botão abaixo para criar uma nova senha:</p>
+            <p style="font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7);">Recebemos uma solicitação para redefinir a senha da sua conta no SorteioClub. Clique no botão abaixo para criar uma nova senha:</p>
             <div style="margin: 28px 0; text-align: center;">
               <a href="${resetUrl}" style="background-color: #facc15; color: #0f172a; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 900; font-size: 15px; display: inline-block; letter-spacing: 0.5px;">
                 Redefinir Minha Senha
@@ -252,7 +252,7 @@ export class EmailService {
             <p style="font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 16px; word-break: break-all;">Link direto: ${resetUrl}</p>
           </div>
           <div style="background-color: rgba(0,0,0,0.3); padding: 16px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.3); border-top: 1px solid rgba(255,255,255,0.08);">
-            SorteioHub • Plataforma de Sorteios Privados em Grupos Fechados (LGPD Compliant)
+            SorteioClub • Plataforma de Sorteios Privados em Grupos Fechados (LGPD Compliant)
           </div>
         </div>
       </div>
@@ -260,7 +260,7 @@ export class EmailService {
 
     return this.sendMail({
       to,
-      subject: '🔐 Redefinição de Senha — SorteioHub',
+      subject: '🔐 Redefinição de Senha — SorteioClub',
       html,
     });
   }

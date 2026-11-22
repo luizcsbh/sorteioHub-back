@@ -1,7 +1,7 @@
 {
-  "name": "sorteiohub-backend",
+  "name": "sorteioclub-backend",
   "version": "1.0.0",
-  "description": "Backend API para SorteioHub",
+  "description": "Backend API para SorteioClub",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",

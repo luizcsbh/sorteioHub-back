@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const HMAC_SECRET = process.env.CPF_HMAC_SECRET || 'sorteiohub-default-hmac-secret-change-in-prod';
+const HMAC_SECRET = process.env.CPF_HMAC_SECRET || 'sorteioclub-default-hmac-secret-change-in-prod';
 // Chave AES-256 deve ter 32 bytes
 const ENCRYPTION_KEY_RAW = process.env.CPF_ENCRYPTION_KEY || '01234567890123456789012345678901';
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(ENCRYPTION_KEY_RAW).digest();
