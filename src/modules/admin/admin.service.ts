@@ -85,6 +85,8 @@ export class AdminService {
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
     });
 
     // 2. Participantes por sorteio e taxa de participação
@@ -103,7 +105,7 @@ export class AdminService {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 200,
     });
 
     // 3. Ganhadores recentes
@@ -114,7 +116,7 @@ export class AdminService {
         user: { select: { id: true, name: true, email: true, cpfMasked: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 200,
     });
 
     // 4. Taxa de aceitação de convites
@@ -131,14 +133,14 @@ export class AdminService {
         group: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 200,
     });
 
     // 5. Auditoria recente
     const recentAudit = await prisma.auditLog.findMany({
       where: isSuperAdmin ? {} : { userId },
       orderBy: { createdAt: 'desc' },
-      take: 25,
+      take: 200,
     });
 
     return {
@@ -150,45 +152,126 @@ export class AdminService {
     };
   }
 
-  static async getUsers(search?: string, roleFilter?: string) {
+  static async getAuditLogs(
+    userId: string,
+    role: Role,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    actionFilter?: string
+  ) {
+    const isSuperAdmin = role === 'SUPER_ADMIN';
+    const where: any = isSuperAdmin ? {} : { userId };
+
+    if (actionFilter && actionFilter !== 'ALL') {
+      where.action = actionFilter;
+    }
+
+    if (search && search.trim()) {
+      where.OR = [
+        { action: { contains: search.trim(), mode: 'insensitive' } },
+        { entity: { contains: search.trim(), mode: 'insensitive' } },
+        { entityId: { contains: search.trim(), mode: 'insensitive' } },
+        { details: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [total, logs] = await Promise.all([
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      logs,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 1,
+      },
+    };
+  }
+
+  static async getUsers(
+    search?: string,
+    roleFilter?: string,
+    page: number = 1,
+    limit: number = 10
+  ) {
     const where: any = {};
     if (search && search.trim()) {
       where.OR = [
         { name: { contains: search.trim(), mode: 'insensitive' } },
         { email: { contains: search.trim(), mode: 'insensitive' } },
+        { phone: { contains: search.trim(), mode: 'insensitive' } },
       ];
     }
     if (roleFilter && ['SUPER_ADMIN', 'ADMINISTRATOR', 'PARTICIPANT'].includes(roleFilter)) {
       where.role = roleFilter;
     }
 
-    const users = await prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        status: true,
-        avatarUrl: true,
-        cpfMasked: true,
-        phone: true,
-        isCpfValidated: true,
-        createdAt: true,
-        _count: {
-          select: {
-            memberships: true,
-            managedGroups: true,
-            raffleParticipations: true,
-            wonPrizes: true,
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Math.min(100, Number(limit) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [total, users] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          avatarUrl: true,
+          cpfMasked: true,
+          phone: true,
+          isCpfValidated: true,
+          createdAt: true,
+          _count: {
+            select: {
+              memberships: true,
+              managedGroups: true,
+              raffleParticipations: true,
+              wonPrizes: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+    ]);
 
-    return users;
+    return {
+      users,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum) || 1,
+      },
+    };
   }
 
   static async updateUserRole(adminUserId: string, targetUserId: string, newRole: Role, req?: any) {

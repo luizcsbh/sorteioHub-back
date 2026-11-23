@@ -24,12 +24,34 @@ export class AdminController {
     }
   }
 
+  static async getAuditLogs(req: Request, res: Response) {
+    try {
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      const search = req.query.search as string;
+      const action = req.query.action as string;
+      const result = await AdminService.getAuditLogs(
+        req.user!.id,
+        req.user!.role,
+        page,
+        limit,
+        search,
+        action
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || 'Erro ao listar trilha de auditoria.' });
+    }
+  }
+
   static async getUsers(req: Request, res: Response) {
     try {
       const search = req.query.search as string;
       const roleFilter = req.query.role as string;
-      const users = await AdminService.getUsers(search, roleFilter);
-      res.json(users);
+      const page = req.query.page ? parseInt(req.query.page as string, 10) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 10;
+      const result = await AdminService.getUsers(search, roleFilter, page, limit);
+      res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message || 'Erro ao listar usuários.' });
     }

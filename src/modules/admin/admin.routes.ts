@@ -20,6 +20,7 @@ router.post('/raffles/:id/draw', RafflesController.executeDraw);
 // Dashboard e Relatórios
 router.get('/dashboard', AdminController.getDashboard);
 router.get('/reports', AdminController.getReports);
+router.get('/audit-logs', AdminController.getAuditLogs);
 
 // Gestão de Usuários e Cargos (Roles)
 router.get('/users', AdminController.getUsers);
