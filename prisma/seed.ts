@@ -1,4 +1,16 @@
-import { PrismaClient, Role, GroupStatus, MembershipStatus, RaffleStatus, RaffleVisibility, WinnerStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  Role,
+  GroupStatus,
+  MembershipStatus,
+  RaffleStatus,
+  RaffleVisibility,
+  WinnerStatus,
+  InvitationType,
+  NotificationChannel,
+  NotificationStatus,
+  CampaignStatus,
+} from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { cleanCpf, maskCpf, isValidCpf } from '../src/utils/cpf.js';
@@ -26,7 +38,6 @@ function generateValidCpf(index: number): string {
 
   const fullCpf = `${base}${d1}${d2}`;
   if (!isValidCpf(fullCpf)) {
-    // Fallback seguro caso algoritmo gere repetidos
     return `999${String(index).padStart(6, '0')}00`;
   }
   return fullCpf;
@@ -64,14 +75,17 @@ const cities = [
 
 async function main() {
   console.log('===========================================================');
-  console.log('🚀 [SorteioClub Seed] Iniciando Povoamento em Grande Escala');
+  console.log('🚀 [SorteioClub Seed Completo] Iniciando Povoamento');
   console.log('===========================================================');
 
-  // Pré-computa o hash bcrypt da senha padrão "Senha@123" para ganho de performance
   const defaultPasswordHash = await bcrypt.hash('Senha@123', 10);
+  const now = new Date();
+  const pastDate = (days: number) => new Date(now.getTime() - days * 86400000);
+  const futureDate = (days: number) => new Date(now.getTime() + days * 86400000);
 
-  // ── 1. SUPER ADMIN ────────────────────────────────────────────────────────
-  console.log('\n👑 1. Criando/Atualizando Super Administrador...');
+  // ── 1. USUÁRIOS ADMINISTRATIVOS ──────────────────────────────────────────
+  console.log('\n👑 1. Criando Usuários Administrativos...');
+
   const adminCpf = '52998224725';
   let superAdmin = await prisma.user.findFirst({
     where: {
@@ -123,8 +137,6 @@ async function main() {
     });
   }
 
-  // ── 2. GESTOR DE COMUNIDADE (ADMINISTRADOR) ───────────────────────────────
-  console.log('👔 2. Criando/Atualizando Gestor de Comunidade...');
   const gestorCpf = '12345678909';
   let gestor = await prisma.user.findFirst({
     where: {
@@ -175,8 +187,41 @@ async function main() {
     });
   }
 
-  // ── 3. CRIAÇÃO DE MAIS DE 100 PARTICIPANTES (120 PARTICIPANTES) ───────────
-  console.log('👥 3. Criando 120 Participantes únicos com dados e CPFs validados...');
+  // Segundo Gestor Administrativo
+  const gestor2Cpf = '98765432100';
+  let gestor2 = await prisma.user.findFirst({
+    where: { email: 'carlos.gerente@sorteioclub.com.br' },
+  });
+
+  if (!gestor2) {
+    gestor2 = await prisma.user.create({
+      data: {
+        email: 'carlos.gerente@sorteioclub.com.br',
+        name: 'Carlos Mendes (Gerente de Sorteios)',
+        role: Role.ADMINISTRATOR,
+        passwordHash: defaultPasswordHash,
+        avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CarlosGerente',
+        phone: '(21) 99888-1122',
+        cpfHash: hashCpf(cleanCpf(gestor2Cpf)),
+        cpfEncrypted: encryptCpf(cleanCpf(gestor2Cpf)),
+        cpfMasked: maskCpf(gestor2Cpf),
+        isCpfValidated: true,
+        address: {
+          create: {
+            cep: '22041001',
+            logradouro: 'Avenida Atlântica',
+            numero: '1500',
+            bairro: 'Copacabana',
+            cidade: 'Rio de Janeiro',
+            estado: 'RJ',
+          },
+        },
+      },
+    });
+  }
+
+  // ── 2. PARTICIPANTES (120 USUÁRIOS ÚNICOS) ────────────────────────────────
+  console.log('👥 2. Criando/Atualizando 120 Participantes com perfil completo...');
   const TOTAL_PARTICIPANTS = 120;
   const participantUsers: any[] = [];
 
@@ -194,6 +239,7 @@ async function main() {
       update: {
         passwordHash: defaultPasswordHash,
         name: fullName,
+        isCpfValidated: true,
       },
       create: {
         email,
@@ -223,84 +269,122 @@ async function main() {
   }
   console.log(`✅ ${participantUsers.length} participantes prontos no banco!`);
 
-  // ── 4. GRUPOS FECHADOS ────────────────────────────────────────────────────
-  console.log('\n🏢 4. Criando Grupos Fechados...');
-  let groupMain = await prisma.group.findFirst({ where: { name: 'Comunidade VIP SorteioClub' } });
-  if (!groupMain) {
-    groupMain = await prisma.group.create({
-      data: {
-        name: 'Comunidade VIP SorteioClub',
-        description: 'Grupo fechado oficial com todos os membros e os maiores sorteios da plataforma.',
-        managerId: gestor.id,
-        status: GroupStatus.ATIVO,
-        autoApprove: true,
-        maxMembers: 1000,
-      },
-    });
-  }
+  // ── 3. GRUPOS FECHADOS (5 GRUPOS TEMÁTICOS) ───────────────────────────────
+  console.log('\n🏢 3. Criando 5 Grupos Fechados Temáticos...');
 
-  let groupTech = await prisma.group.findFirst({ where: { name: 'Tech & Gamers Club' } });
-  if (!groupTech) {
-    groupTech = await prisma.group.create({
-      data: {
-        name: 'Tech & Gamers Club',
-        description: 'Grupo exclusivo focado em gadgets, consoles, computadores e tecnologia de ponta.',
-        managerId: superAdmin.id,
-        status: GroupStatus.ATIVO,
-        autoApprove: true,
-        maxMembers: 500,
-      },
-    });
-  }
+  const groupsData = [
+    {
+      name: 'Comunidade VIP SorteioClub',
+      description: 'Grupo fechado oficial com todos os membros e os maiores sorteios da plataforma.',
+      managerId: gestor.id,
+      memberCount: 120, // Todos os 120
+    },
+    {
+      name: 'Tech & Gamers Club',
+      description: 'Grupo exclusivo focado em gadgets, consoles, computadores e tecnologia de ponta.',
+      managerId: superAdmin.id,
+      memberCount: 85,
+    },
+    {
+      name: 'Experiências & Estilo de Vida',
+      description: 'Sorteios de viagens internacionais, resorts e pacotes turísticos completos.',
+      managerId: gestor.id,
+      memberCount: 70,
+    },
+    {
+      name: 'Clube Automotivo & Motores',
+      description: 'Grupo dedicado aos apaixonados por carros 0km, motos esportivas e mobilidade elétrica.',
+      managerId: gestor2.id,
+      memberCount: 60,
+    },
+    {
+      name: 'Investidores & Empreendedores',
+      description: 'Prêmios expressivos em dinheiro vivo, aportes e transferências Pix instantâneas.',
+      managerId: gestor2.id,
+      memberCount: 50,
+    },
+  ];
 
-  let groupExperience = await prisma.group.findFirst({ where: { name: 'Experiências & Estilo de Vida' } });
-  if (!groupExperience) {
-    groupExperience = await prisma.group.create({
-      data: {
-        name: 'Experiências & Estilo de Vida',
-        description: 'Sorteios de viagens internacionais, resorts e veículos especiais.',
-        managerId: gestor.id,
-        status: GroupStatus.ATIVO,
-        autoApprove: true,
-        maxMembers: 500,
-      },
-    });
-  }
+  const seededGroups: any[] = [];
 
-  // Inscreve todos os 120 participantes no grupo principal
-  console.log('📥 Vinculando participantes aos grupos fechados...');
-  for (const p of participantUsers) {
-    await prisma.groupMember.upsert({
-      where: {
-        groupId_userId: {
-          groupId: groupMain.id,
-          userId: p.id,
+  for (const gDef of groupsData) {
+    let group = await prisma.group.findFirst({ where: { name: gDef.name } });
+    if (!group) {
+      group = await prisma.group.create({
+        data: {
+          name: gDef.name,
+          description: gDef.description,
+          managerId: gDef.managerId,
+          status: GroupStatus.ATIVO,
+          autoApprove: true,
+          maxMembers: 1000,
         },
-      },
-      update: { status: MembershipStatus.ATIVO },
-      create: {
-        groupId: groupMain.id,
-        userId: p.id,
-        status: MembershipStatus.ATIVO,
-        joinedAt: new Date(),
-      },
-    });
+      });
+    }
+    seededGroups.push({ group, memberCount: gDef.memberCount });
+
+    // Vincula participantes a este grupo
+    const membersToInclude = participantUsers.slice(0, gDef.memberCount);
+    for (const p of membersToInclude) {
+      await prisma.groupMember.upsert({
+        where: {
+          groupId_userId: {
+            groupId: group.id,
+            userId: p.id,
+          },
+        },
+        update: { status: MembershipStatus.ATIVO },
+        create: {
+          groupId: group.id,
+          userId: p.id,
+          status: MembershipStatus.ATIVO,
+          joinedAt: pastDate(Math.floor(Math.random() * 30) + 1),
+        },
+      });
+    }
+    console.log(`   ✓ Grupo "${gDef.name}": ${membersToInclude.length} membros vinculados.`);
   }
 
-  // ── 5. CRIAÇÃO DOS 10 SORTEIOS ────────────────────────────────────────────
-  console.log('\n🎁 5. Criando os 10 Sorteios Oficiais...');
+  const [groupMain, groupTech, groupExperience, groupAuto, groupMoney] = seededGroups.map(
+    (sg) => sg.group
+  );
 
-  const now = new Date();
-  const futureDate = (days: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() + days);
-    return d;
-  };
-  const pastDate = (days: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - days);
-    return d;
-  };
+  // ── 4. CONVITES DE GRUPOS (PARA RELATÓRIO DE CONVITES) ────────────────────
+  console.log('\n🎟️ 4. Gerando Convites de Grupos (Ativos e Histórico)...');
+  const invitationsData = [
+    { group: groupMain, token: 'VIP-NACIONAL-2026', type: InvitationType.TOKEN_LINK, maxUses: 500, currentUses: 120 },
+    { group: groupMain, token: 'QR-COMUNIDADE-VIP', type: InvitationType.QR_CODE, maxUses: 200, currentUses: 85 },
+    { group: groupTech, token: 'TECH-GAMERS-PASS', type: InvitationType.TOKEN_LINK, maxUses: 150, currentUses: 85 },
+    { group: groupTech, token: 'QR-TECH-SUMMIT', type: InvitationType.QR_CODE, maxUses: 100, currentUses: 45 },
+    { group: groupExperience, token: 'EXPERIENCE-TRAVEL', type: InvitationType.TOKEN_LINK, maxUses: 100, currentUses: 70 },
+    { group: groupExperience, token: 'QR-RESORT-VIP', type: InvitationType.QR_CODE, maxUses: 50, currentUses: 28 },
+    { group: groupAuto, token: 'AUTO-CLUB-CONVITE', type: InvitationType.TOKEN_LINK, maxUses: 100, currentUses: 60 },
+    { group: groupMoney, token: 'INVESTIDORES-PIX', type: InvitationType.TOKEN_LINK, maxUses: 80, currentUses: 50 },
+    { group: groupMain, token: 'PROMO-EXPIRADA-01', type: InvitationType.TOKEN_LINK, maxUses: 50, currentUses: 50, isRevoked: true },
+    { group: groupTech, token: 'TOKEN-REVOGADO-02', type: InvitationType.TOKEN_LINK, maxUses: 30, currentUses: 12, isRevoked: true },
+  ];
+
+  for (const inv of invitationsData) {
+    const existingInv = await prisma.groupInvitation.findUnique({ where: { token: inv.token } });
+    if (!existingInv) {
+      await prisma.groupInvitation.create({
+        data: {
+          groupId: inv.group.id,
+          token: inv.token,
+          type: inv.type,
+          maxUses: inv.maxUses,
+          currentUses: inv.currentUses,
+          isRevoked: inv.isRevoked || false,
+          expiresAt: futureDate(60),
+          createdById: inv.group.managerId,
+        },
+      });
+    }
+  }
+  console.log(`✅ ${invitationsData.length} convites configurados!`);
+
+  // ── 5. CRIAÇÃO DOS 10 SORTEIOS OFICIAIS ───────────────────────────────────
+  console.log('\n🎁 5. Criando os 10 Sorteios Oficiais com Bilhetes...');
 
   const rafflesDefinitions = [
     // 1. SORTEIO GERAL: COM TODOS OS 120 PARTICIPANTES
@@ -320,7 +404,6 @@ async function main() {
       drawDate: futureDate(26),
       createdById: gestor.id,
     },
-
     // 2. IPHONE 16 PRO MAX
     {
       index: 2,
@@ -338,7 +421,6 @@ async function main() {
       drawDate: futureDate(13),
       createdById: superAdmin.id,
     },
-
     // 3. PLAYSTATION 5 PRO
     {
       index: 3,
@@ -356,7 +438,6 @@ async function main() {
       drawDate: futureDate(9),
       createdById: superAdmin.id,
     },
-
     // 4. MACBOOK PRO M3
     {
       index: 4,
@@ -374,7 +455,6 @@ async function main() {
       drawDate: futureDate(16),
       createdById: superAdmin.id,
     },
-
     // 5. SMART TV OLED 65
     {
       index: 5,
@@ -392,7 +472,6 @@ async function main() {
       drawDate: futureDate(11),
       createdById: gestor.id,
     },
-
     // 6. VIAGEM PARA FERNANDO DE NORONHA
     {
       index: 6,
@@ -403,18 +482,17 @@ async function main() {
       rules: '1. Válido para maiores de 18 anos.\n2. Data de embarque flexível para o ano corrente.',
       winnerInstructions: 'Voucher emitido pela agência de turismo parceira.',
       status: RaffleStatus.PUBLISHED,
-      participantCount: 90,
+      participantCount: 70,
       ticketPrefix: 600000,
       start: pastDate(7),
       end: futureDate(18),
       drawDate: futureDate(19),
       createdById: gestor.id,
     },
-
     // 7. SCOOTER ELÉTRICA BMW
     {
       index: 7,
-      group: groupExperience,
+      group: groupAuto,
       title: 'Mobilidade Urbana: Scooter Elétrica BMW CE 04 2026',
       description: 'O futuro sobre duas rodas. 100% elétrica, conectividade avançada e design futurista.',
       prize: 'Scooter BMW CE 04 0KM Emplacada e com Seguro de 1 Ano',
@@ -426,27 +504,25 @@ async function main() {
       start: pastDate(6),
       end: futureDate(21),
       drawDate: futureDate(22),
-      createdById: gestor.id,
+      createdById: gestor2.id,
     },
-
     // 8. PIX INSTANTÂNEO R$ 10.000
     {
       index: 8,
-      group: groupMain,
+      group: groupMoney,
       title: 'Pix na Conta: R$ 10.000 Instantâneo',
       description: 'Dinheiro na mão para usar como quiser. Transferência direta via Pix após a apuração.',
       prize: 'R$ 10.000 via Pix Imediato',
       rules: '1. O Pix será enviado à chave de titularidade do CPF vencedor.\n2. Prova de pagamento registrada em auditoria.',
       winnerInstructions: 'Confirmação da chave Pix pelo painel do usuário contemplado.',
       status: RaffleStatus.PUBLISHED,
-      participantCount: 110,
+      participantCount: 50,
       ticketPrefix: 800000,
       start: pastDate(2),
       end: futureDate(5),
       drawDate: futureDate(6),
-      createdById: gestor.id,
+      createdById: gestor2.id,
     },
-
     // 9. NINTENDO SWITCH OLED (SORTEIO JÁ REALIZADO COM GANHADOR AUDITADO)
     {
       index: 9,
@@ -464,7 +540,6 @@ async function main() {
       drawDate: pastDate(1),
       createdById: superAdmin.id,
     },
-
     // 10. DRONE DJI MINI 4 PRO
     {
       index: 10,
@@ -485,9 +560,8 @@ async function main() {
   ];
 
   for (const def of rafflesDefinitions) {
-    console.log(`\n🎟️ Processando Sorteio ${def.index}/10: "${def.title}"...`);
+    console.log(`   🎟️ Sorteio ${def.index}/10: "${def.title}"...`);
 
-    // Busca ou cria o sorteio
     let raffle = await prisma.raffle.findFirst({
       where: {
         groupId: def.group.id,
@@ -516,15 +590,11 @@ async function main() {
       });
     }
 
-    // Seleção de participantes para este sorteio:
-    // Se for o sorteio 1: pega TODOS os 120 participantes!
-    // Se for outro sorteio: pega um subconjunto mesclado de forma determinística
+    // Garante que os membros do sorteio também são membros do grupo
     let selectedParticipants: any[] = [];
     if (def.participantCount >= TOTAL_PARTICIPANTS) {
       selectedParticipants = participantUsers;
     } else {
-      // Mescla os participantes usando um offset baseado no índice do sorteio
-      selectedParticipants = [];
       const offset = (def.index * 13) % TOTAL_PARTICIPANTS;
       for (let k = 0; k < def.participantCount; k++) {
         const pIndex = (offset + k) % TOTAL_PARTICIPANTS;
@@ -532,12 +602,28 @@ async function main() {
       }
     }
 
-    console.log(`   Inscritos: ${selectedParticipants.length} participantes.`);
+    // Cadastra membros no grupo caso ainda não estejam
+    for (const p of selectedParticipants) {
+      await prisma.groupMember.upsert({
+        where: {
+          groupId_userId: {
+            groupId: def.group.id,
+            userId: p.id,
+          },
+        },
+        update: { status: MembershipStatus.ATIVO },
+        create: {
+          groupId: def.group.id,
+          userId: p.id,
+          status: MembershipStatus.ATIVO,
+          joinedAt: pastDate(20),
+        },
+      });
+    }
 
     // Cadastra cada participante com seu NÚMERO GERADO PELO SISTEMA
     let ticketCounter = 1;
     for (const p of selectedParticipants) {
-      // O número do participante gerado pelo sistema
       const ticketNumber = String(def.ticketPrefix + ticketCounter);
       const formattedTicketCode = `Nº ${ticketNumber}`;
 
@@ -555,21 +641,18 @@ async function main() {
           raffleId: raffle.id,
           userId: p.id,
           ticketCode: formattedTicketCode,
-          confirmedAt: pastDate(Math.max(1, 15 - ticketCounter % 14)),
+          confirmedAt: pastDate(Math.max(1, 15 - (ticketCounter % 14))),
         },
       });
 
       ticketCounter++;
     }
 
-    // Se for o Sorteio 9 (DRAWN): cria o sorteio realizado com apuração criptográfica auditável e ganhador
+    // Se for o Sorteio 9 (DRAWN): registra apuração criptográfica auditável e ganhador
     if (def.status === RaffleStatus.DRAWN) {
-      console.log('   🎲 Registrando apuração criptográfica e ganhador do sorteio...');
       const existingDraw = await prisma.draw.findFirst({ where: { raffleId: raffle.id } });
       if (!existingDraw) {
-        // Escolhe o participante ganhador (ex: participante número 7)
         const winnerParticipant = selectedParticipants[6] || selectedParticipants[0];
-
         const eligibleIds = selectedParticipants.map((p) => p.id);
         const participantsHash = crypto
           .createHash('sha256')
@@ -578,7 +661,7 @@ async function main() {
 
         const drawSeed = crypto.randomBytes(32).toString('hex');
 
-        const draw = await prisma.draw.create({
+        await prisma.draw.create({
           data: {
             raffleId: raffle.id,
             executedById: def.createdById,
@@ -607,26 +690,141 @@ async function main() {
             },
           },
         });
-
-        console.log(`   🏆 Ganhador registrado: ${winnerParticipant.name} (Bilhete: Nº ${def.ticketPrefix + 7})!`);
+        console.log(`   🏆 Ganhador registrado: ${winnerParticipant.name}!`);
       }
     }
   }
 
+  // ── 6. NOTIFICAÇÕES PARA OS USUÁRIOS ──────────────────────────────────────
+  console.log('\n🔔 6. Criando Notificações para Usuários...');
+  const sampleUsers = participantUsers.slice(0, 15);
+  for (const u of sampleUsers) {
+    const existingNotif = await prisma.notification.findFirst({ where: { userId: u.id } });
+    if (!existingNotif) {
+      await prisma.notification.createMany({
+        data: [
+          {
+            userId: u.id,
+            title: 'Bilhete Emitido!',
+            message: 'Sua inscrição no Grande Sorteio Anual foi confirmada com sucesso.',
+            channel: NotificationChannel.IN_APP,
+            status: NotificationStatus.SENT,
+            actionUrl: '/raffles',
+            createdAt: pastDate(2),
+          },
+          {
+            userId: u.id,
+            title: 'Novo Sorteio Disponível!',
+            message: 'O sorteio iPhone 16 Pro Max já está recebendo inscrições no Tech & Gamers Club.',
+            channel: NotificationChannel.IN_APP,
+            status: NotificationStatus.SENT,
+            actionUrl: '/raffles',
+            createdAt: pastDate(1),
+          },
+        ],
+      });
+    }
+  }
+  console.log(`✅ Notificações adicionadas aos participantes.`);
+
+  // ── 7. TRILHA DE AUDITORIA COMPLETA (80+ LOGS PARA PAGINAÇÃO) ────────────
+  console.log('\n🛡️ 7. Povoando Trilha de Auditoria (AuditLogs) com 80+ eventos...');
+  const auditActions = [
+    { action: 'USER_LOGIN', entity: 'User', details: 'Login efetuado com sucesso via credenciais de e-mail/senha.' },
+    { action: 'CPF_VALIDATED', entity: 'User', details: 'Validação de CPF aprovada com verificação LGPD e dupla camada criptográfica.' },
+    { action: 'TICKET_PURCHASED', entity: 'RaffleParticipant', details: 'Bilhete numerado emitido com hash determinístico e regras aceitas.' },
+    { action: 'MEMBER_APPROVED', entity: 'GroupMember', details: 'Membro aprovado e integrado à comunidade fechada com permissão de sorteio.' },
+    { action: 'RAFFLE_CREATED', entity: 'Raffle', details: 'Sorteio registrado em conformidade regulatória e vinculado ao grupo gestor.' },
+    { action: 'RAFFLE_PUBLISHED', entity: 'Raffle', details: 'Sorteio publicado oficialmente e aberto para emissão de bilhetes.' },
+    { action: 'USER_ROLE_UPDATED', entity: 'User', details: 'Papel administrativo atualizado na governança do sistema.' },
+    { action: 'DRAW_EXECUTED', entity: 'Draw', details: 'Apuração concluída com semente determinística SHA-256 e gravação imutável.' },
+  ];
+
+  const auditLogsToCreate: any[] = [];
+  for (let i = 0; i < 85; i++) {
+    const act = auditActions[i % auditActions.length];
+    const u = participantUsers[i % participantUsers.length];
+    auditLogsToCreate.push({
+      userId: i % 5 === 0 ? superAdmin.id : u.id,
+      action: act.action,
+      entity: act.entity,
+      entityId: u.id,
+      details: act.details,
+      ipAddress: `189.${Math.floor(Math.random() * 200) + 10}.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`,
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36',
+      createdAt: pastDate(Math.floor(i / 3) + 1),
+    });
+  }
+
+  await prisma.auditLog.createMany({
+    data: auditLogsToCreate,
+  });
+  console.log(`✅ ${auditLogsToCreate.length} eventos de auditoria registrados.`);
+
+  // ── 8. CAMPANHAS DE E-MAIL (PARA TELA DE CAMPANHAS) ───────────────────────
+  console.log('\n📧 8. Criando Campanhas de E-mail de Exemplo...');
+  const campaignsData = [
+    {
+      group: groupMain,
+      title: 'Abertura do Grande Sorteio Anual 2026',
+      subject: 'Participe agora: Carro 0KM ou Pix de R$ 100.000!',
+      body: 'Olá membro VIP! O maior sorteio do ano já está aberto. Garanta seu bilhete oficial com segurança.',
+      status: CampaignStatus.SENT,
+      sentAt: pastDate(3),
+      createdById: gestor.id,
+    },
+    {
+      group: groupTech,
+      title: 'Novidade Tech: iPhone 16 Pro Max Liberado',
+      subject: 'Inscrições abertas para o iPhone 16 Pro Max no Tech & Gamers',
+      body: 'Seu grupo exclusivo tem um novo prêmio disponível. Acesse o painel para emitir seu bilhete.',
+      status: CampaignStatus.SENT,
+      sentAt: pastDate(1),
+      createdById: superAdmin.id,
+    },
+    {
+      group: groupExperience,
+      title: 'Em Breve: Viagem dos Sonhos para Noronha',
+      subject: 'Prepare as malas! Novo sorteio de viagem internacional',
+      body: 'Faltam poucos dias para a grande viagem. Confira as datas e regulamento oficial.',
+      status: CampaignStatus.DRAFT,
+      createdById: gestor.id,
+    },
+  ];
+
+  for (const c of campaignsData) {
+    const existingCamp = await prisma.emailCampaign.findFirst({ where: { title: c.title } });
+    if (!existingCamp) {
+      await prisma.emailCampaign.create({
+        data: {
+          groupId: c.group.id,
+          title: c.title,
+          subject: c.subject,
+          body: c.body,
+          status: c.status,
+          sentAt: c.sentAt,
+          createdById: c.createdById,
+        },
+      });
+    }
+  }
+  console.log(`✅ Campanhas de e-mail cadastradas.`);
+
   console.log('\n===========================================================');
-  console.log('🎉 [SorteioClub Seed] Concluído com Sucesso Total!');
+  console.log('🎉 [SorteioClub Seed Completo] Concluído com Sucesso Total!');
   console.log('===========================================================');
-  console.log('• Total de Participantes criados: 120');
-  console.log('• Total de Sorteios criados: 10');
+  console.log('• Total de Usuários: 123 (1 Super Admin, 2 Gestores, 120 Participantes)');
+  console.log('• Total de Grupos: 5 Grupos Fechados Temáticos com membros');
+  console.log('• Total de Sorteios: 10 Sorteios Oficiais com bilhetes numerados');
   console.log('• Sorteio #1: Com TODOS os 120 participantes inscritos');
-  console.log('• Sorteios #2 a #10: Participantes mesclados e distribuídos');
-  console.log('• Bilhetes: Cada participante possui seu NÚMERO gerado (ex: Nº 100001)');
-  console.log('• Login padrão para todos os participantes de teste:');
-  console.log('    E-mail: participante001@sorteioclub.com.br (até participante120)');
-  console.log('    Senha:  Senha@123');
-  console.log('• Login de Administrador:');
-  console.log('    E-mail: admin@sorteioclub.com.br');
-  console.log('    Senha:  Senha@123');
+  console.log('• Convites: 10 convites emitidos para testar relatórios');
+  console.log('• Auditoria: 85+ eventos registrados com suporte a paginação');
+  console.log('• Campanhas: 3 campanhas de e-mail registradas');
+  console.log('• Credenciais:');
+  console.log('    Super Admin: admin@sorteioclub.com.br / Senha@123');
+  console.log('    Gestor VIP:  gestor@empresa.com.br / Senha@123');
+  console.log('    Gestor Auto: carlos.gerente@sorteioclub.com.br / Senha@123');
+  console.log('    Participantes: participante001@sorteioclub.com.br a participante120@sorteioclub.com.br / Senha@123');
   console.log('===========================================================');
 }
 
